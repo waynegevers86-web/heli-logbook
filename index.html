@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flight Logbook</title>
+<meta name="theme-color" content="#111110">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Logbook">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{color-scheme:dark;
+ --page:#0d0d0d;--surface:#1a1a19;--inset:#111110;
+ --ink:#ffffff;--ink2:#c3c2b7;--muted:#898781;
+ --line:#2c2c2a;--edge:#383835;--border:rgba(255,255,255,.10);
+ --accent:#3987e5;--good:#0ca30c;--warn:#fab219;--crit:#d03b3b;}
+body{font-family:system-ui,-apple-system,"Segoe UI",Arial,sans-serif;background:var(--page);color:var(--ink);font-size:14px;padding:16px;min-height:100vh;}
+@media(max-width:600px){body{padding:6px;}}
+.page{background:var(--surface);max-width:780px;margin:0 auto;border:1px solid var(--border);border-radius:10px;overflow:hidden;min-height:90vh;}
+.hdr{background:var(--inset);color:var(--ink);padding:16px 22px;border-bottom:1px solid var(--border);}
+.htitle{font-size:18px;font-weight:700;letter-spacing:.03em;}
+.hsub{font-size:11px;color:var(--muted);margin-top:2px;}
+.tabs{display:flex;background:var(--inset);flex-wrap:wrap;border-bottom:1px solid var(--border);}
+.tab{flex:1 1 auto;white-space:nowrap;text-align:center;padding:11px 8px;color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;cursor:pointer;border-bottom:3px solid transparent;user-select:none;-webkit-tap-highlight-color:transparent;}
+@media(max-width:600px){.tab{font-size:10px;letter-spacing:.02em;padding:10px 5px;}}
+.tab.on{color:var(--ink);border-bottom-color:var(--accent);background:var(--surface);}
+.body{padding:20px 22px;}
+@media(max-width:600px){.body{padding:14px 12px;}}
+h2{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700;border-bottom:1px solid var(--line);padding-bottom:5px;margin:22px 0 10px;}
+h2:first-child{margin-top:0;}
+.cards{display:flex;gap:10px;flex-wrap:wrap;}
+.card{flex:1;min-width:120px;background:var(--inset);border:1px solid var(--border);border-radius:8px;padding:12px 14px;}
+.card .big{font-size:24px;font-weight:700;color:var(--ink);}
+.card .lbl{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-top:2px;}
+.card .sub{font-size:11px;color:var(--ink2);margin-top:3px;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px 18px;}
+.kv{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:5px 0;font-size:13px;}
+.kv .k{color:var(--ink2);}
+.kv .v{font-weight:700;font-variant-numeric:tabular-nums;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:left;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);font-weight:700;border-bottom:1px solid var(--edge);padding:6px 6px;}
+td{padding:6px 6px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums;}
+tfoot td{border-top:1px solid var(--edge);border-bottom:none;font-weight:700;}
+td:first-child{white-space:nowrap;}
+tr.click{cursor:pointer;}
+tr.click:active{background:rgba(57,135,229,.10);}
+.num{text-align:right;}
+.bar{height:7px;background:var(--accent);border-radius:4px;display:inline-block;vertical-align:middle;}
+.barwrap{background:var(--line);border-radius:4px;overflow:hidden;flex:1;}
+.crow{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--border);background:var(--inset);border-radius:8px;margin-bottom:8px;}
+.dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;}
+.g{background:var(--good);}.y{background:var(--warn);}.r{background:var(--crit);}
+.crow .nm{font-weight:700;flex:1;}
+.crow .meta{font-size:12px;color:var(--muted);text-align:right;}
+.exp{display:flex;gap:10px;align-items:center;margin-bottom:7px;flex-wrap:wrap;}
+.exp label{flex:1;min-width:140px;font-size:13px;font-weight:700;color:var(--ink2);}
+.exp input{border:1px solid var(--edge);background:var(--inset);color:var(--ink);border-radius:6px;padding:6px 8px;font-size:13px;font-family:inherit;}
+.exp .stat{font-size:12px;min-width:120px;text-align:right;}
+.f label{display:block;font-size:10px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:10px 0 3px;font-weight:700;}
+.f input,.f select,.f textarea{width:100%;border:1px solid var(--edge);border-radius:6px;padding:9px 10px;font-size:15px;font-family:inherit;color:var(--ink);background:var(--inset);}
+.f input:focus,.f select:focus{outline:none;border-color:var(--accent);}
+.frow{display:flex;gap:10px;flex-wrap:wrap;}
+.frow>div{flex:1;min-width:120px;}
+.seg{display:flex;border:1px solid var(--edge);border-radius:6px;overflow:hidden;}
+.seg button{flex:1;border:none;background:var(--inset);padding:10px;font-size:14px;font-family:inherit;cursor:pointer;color:var(--ink2);}
+.seg button.on{background:var(--accent);color:#fff;font-weight:700;}
+.btn{background:var(--accent);color:#fff;border:none;border-radius:6px;padding:12px 18px;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;margin-top:16px;width:100%;}
+.btn:active{filter:brightness(.85);}
+.btn.dark{background:var(--inset);border:1px solid var(--edge);}
+.btn.ghost{background:transparent;color:var(--ink2);border:1px solid var(--edge);font-weight:600;}
+.btn.danger{background:transparent;color:var(--crit);border:1px solid rgba(208,59,59,.45);}
+.btnrow{display:flex;gap:10px;}
+.btnrow .btn{margin-top:10px;}
+.search{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+.search input,.search select{border:1px solid var(--edge);background:var(--inset);color:var(--ink);border-radius:6px;padding:8px 10px;font-size:14px;font-family:inherit;}
+.search input{flex:1;min-width:140px;}
+.muted{color:var(--muted);font-size:12px;}
+.note{background:rgba(250,178,25,.07);border:1px solid rgba(250,178,25,.25);border-radius:6px;padding:10px 12px;font-size:12px;color:#d9c07a;margin-bottom:12px;}
+.hide{display:none;}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--inset);border:1px solid var(--border);color:var(--ink);padding:10px 18px;border-radius:6px;font-size:13px;box-shadow:0 3px 14px rgba(0,0,0,.5);opacity:0;transition:opacity .25s;z-index:99;pointer-events:none;}
+.toast.show{opacity:1;}
+.pager{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:13px;}
+.pager button{border:1px solid var(--edge);background:var(--inset);color:var(--ink2);border-radius:6px;padding:6px 12px;font-family:inherit;cursor:pointer;}
+.pager button:disabled{opacity:.4;}
+@media print{
+ :root{color-scheme:light;}
+ body{background:white;color:#111;padding:0;}
+ .page{background:white;border:none;border-radius:0;}
+ .hdr{background:white;color:#111;border-bottom:2px solid #111;}
+ .hsub{color:#555;}
+ .tabs,.noprint,.note{display:none!important;}
+ h2{color:#555;border-bottom-color:#bbb;}
+ .card{background:white;border:1px solid #bbb;}
+ .card .big{color:#111;}
+ .card .lbl,.card .sub{color:#555;}
+ .kv{border-bottom-color:#ddd;}.kv .k{color:#555;}
+ th{color:#555;border-bottom-color:#999;}
+ td{border-bottom-color:#ddd;}
+ tfoot td{border-top-color:#999;}
+ .muted{color:#777;}
+ .bar{background:#888;}.barwrap{background:#eee;}
+ .crow{background:white;border-color:#bbb;}.crow .meta{color:#555;}
+}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="hdr">
+    <div class="htitle">FLIGHT LOGBOOK</div>
+    <div class="hsub"><span id="hpilot"></span><span id="hsummary"></span> &middot; <span id="bkstat"></span></div>
+  </div>
+  <div class="tabs">
+    <div class="tab on" data-v="dash" onclick="go('dash')">Dashboard</div>
+    <div class="tab" data-v="y12" onclick="go('y12')">12 Months</div>
+    <div class="tab" data-v="curr" onclick="go('curr')">Currency</div>
+    <div class="tab" data-v="log" onclick="go('log')">Logbook</div>
+    <div class="tab" data-v="add" onclick="go('add')">Add Flight</div>
+    <div class="tab" data-v="data" onclick="go('data')">Data</div>
+  </div>
+  <div class="body">
+    <div id="v-dash"></div>
+    <div id="v-y12" class="hide"></div>
+    <div id="v-curr" class="hide"></div>
+    <div id="v-log" class="hide"></div>
+    <div id="v-add" class="hide"></div>
+    <div id="v-data" class="hide"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const SEED = [];
+const SEED_VERSION = 0;   // data-free shell: stored data always wins
+
+const ROLE=['sdd','sdp','sds','sdc','snd','snp','sns','snc','mdd','mdp','mds','mdc','mnd','mnp','mns','mnc'];
+const NIGHT=['snd','snp','sns','snc','mnd','mnp','mns','mnc'];
+const ME=['mdd','mdp','mds','mdc','mnd','mnp','mns','mnc'];
+const PIC=['sdp','snp','mdp','mnp'], PICUS=['sds','sns','mds','mns'],
+      DUAL=['sdd','snd','mdd','mnd'], COP=['sdc','snc','mdc','mnc'];
+
+let FL=[], META={}, logPage=0, logFilter={q:'',t:''}, editIdx=-1;
+
+function load(){
+  try{
+    let v=parseInt(localStorage.getItem('fl_seed_version')||'0');
+    let s=localStorage.getItem('fl_flights');
+    if(s && v>=SEED_VERSION){ FL=JSON.parse(s); }
+    else { FL=JSON.parse(JSON.stringify(SEED)); localStorage.setItem('fl_seed_version',SEED_VERSION); save(); }
+  }catch(e){ FL=JSON.parse(JSON.stringify(SEED)); }
+  try{ META=JSON.parse(localStorage.getItem('fl_meta')||'{}'); }catch(e){ META={}; }
+}
+function save(){ try{ localStorage.setItem('fl_flights',JSON.stringify(FL)); }catch(e){} }
+function saveMeta(){ try{ localStorage.setItem('fl_meta',JSON.stringify(META)); }catch(e){} }
+
+const sum=(f,keys)=>keys.reduce((a,k)=>a+(f[k]||0),0);
+const total=f=>sum(f,ROLE);
+const round1=n=>Math.round(n*10)/10;
+function totals(list){
+  let o={hrs:0,night:0,me:0,pic:0,picus:0,dual:0,cop:0,ia:0,isim:0,ltc:0,n:list.length,to:0,ld:0};
+  for(const f of list){ o.hrs+=total(f); o.night+=sum(f,NIGHT); o.me+=sum(f,ME);
+    o.pic+=sum(f,PIC); o.picus+=sum(f,PICUS); o.dual+=sum(f,DUAL); o.cop+=sum(f,COP);
+    o.ia+=(f.ia||0); o.isim+=(f.isim||0); o.ltc+=(f.ltc||0); o.to+=(f.tod||0)+(f.ton||0); o.ld+=(f.ldd||0)+(f.ldn||0); }
+  return o;
+}
+function daysAgo(dstr){ const d=new Date(dstr+'T00:00:00'); return Math.floor((Date.now()-d)/864e5); }
+function inLast(days){ const cut=Date.now()-days*864e5; return FL.filter(f=>new Date(f.d+'T00:00:00')>=cut); }
+function typeIsME(t){ return FL.some(f=>f.t===t && sum(f,ME)>0); }
+
+function go(v){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.v===v));
+  ['dash','y12','curr','log','add','data'].forEach(x=>document.getElementById('v-'+x).classList.toggle('hide',x!==v));
+  if(v==='dash')renderDash(); if(v==='y12')renderY12(); if(v==='curr')renderCurr(); if(v==='log')renderLog();
+  if(v==='add'&&editIdx<0)renderAdd(); if(v==='data')renderData();
+  renderBackupNudge(); renderPilot();
+  window.scrollTo(0,0);
+}
+function renderPilot(){
+  const el=document.getElementById('hpilot');
+  el.textContent = META.pilot ? META.pilot+(META.lic?' \u00b7 Lic '+META.lic:'')+' \u00b7 ' : '';
+}
+function setPilot(){
+  META.pilot=document.getElementById('setname').value.trim();
+  META.lic=document.getElementById('setlic').value.trim();
+  saveMeta(); renderPilot(); toast('Saved');
+}
+function renderBackupNudge(){
+  const el=document.getElementById('bkstat'); if(!el)return;
+  if(!META.backupAt){ el.innerHTML='<span style="color:var(--warn)">no backup yet &mdash; Data tab</span>'; return; }
+  const days=Math.floor((Date.now()-META.backupAt)/864e5);
+  const fresh=FL.length-(META.backupN||0);
+  if(days>14||fresh>=10){ el.innerHTML='<span style="color:var(--warn)">backup overdue ('+days+'d, +'+Math.max(0,fresh)+' flights)</span>'; }
+  else { el.textContent='backed up '+(days===0?'today':days+'d ago'); }
+}
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),1800); }
+
+function renderDash(){
+  const T=totals(FL), d28=totals(inLast(28)), d90=totals(inLast(90));
+  const span = FL.length? Math.round(daysAgo(FL[0].d)/365.25*10)/10 : 0;
+  document.getElementById('hsummary').textContent = round1(T.hrs).toLocaleString()+' hrs / '+T.n+' flights';
+  if(!FL.length){ document.getElementById('v-dash').innerHTML=
+    '<div class="note">Fresh install. Go to <b>Data &rarr; Import JSON backup</b> to load your logbook, then set your name under Pilot details.</div>'; return; }
+  const byT={}; for(const f of FL){ (byT[f.t]=byT[f.t]||[]).push(f); }
+  const types=Object.keys(byT).map(t=>{ const tt=totals(byT[t]); const last=byT[t].reduce((a,f)=>f.d>a?f.d:a,'0');
+    return {t,hrs:tt.hrs,n:tt.n,pic:tt.pic,last,ago:daysAgo(last)}; }).sort((a,b)=>b.hrs-a.hrs);
+  const maxH=Math.max(...types.map(x=>x.hrs));
+  let rows=types.map(x=>`<tr><td><b>${x.t}</b></td><td class="num">${round1(x.hrs).toLocaleString()}</td>
+     <td class="num">${x.n}</td><td class="num">${round1(x.pic).toLocaleString()}</td>
+     <td style="width:30%"><div class="barwrap"><span class="bar" style="width:${Math.round(x.hrs/maxH*100)}%"></span></div></td>
+     <td class="num muted">${x.ago>9000?'-':x.ago+'d'}</td></tr>`).join('');
+  document.getElementById('v-dash').innerHTML = `
+   <h2>Totals</h2>
+   <div class="cards">
+     <div class="card"><div class="big">${round1(T.hrs).toLocaleString()}</div><div class="lbl">Total hours</div><div class="sub">${span} yrs of flying</div></div>
+     <div class="card"><div class="big">${T.n.toLocaleString()}</div><div class="lbl">Flights</div></div>
+     <div class="card"><div class="big">${round1(d28.hrs)}</div><div class="lbl">Last 28 days</div><div class="sub">${d28.n} flights</div></div>
+     <div class="card"><div class="big">${round1(d90.hrs)}</div><div class="lbl">Last 90 days</div><div class="sub">${d90.n} flights</div></div>
+   </div>
+   <h2>Breakdown</h2>
+   <div class="grid2">
+     <div class="kv"><span class="k">PIC</span><span class="v">${round1(T.pic).toLocaleString()}</span></div>
+     <div class="kv"><span class="k">Day</span><span class="v">${round1(T.hrs-T.night).toLocaleString()}</span></div>
+     <div class="kv"><span class="k">PICUS</span><span class="v">${round1(T.picus).toLocaleString()}</span></div>
+     <div class="kv"><span class="k">Night</span><span class="v">${round1(T.night).toLocaleString()}</span></div>
+     <div class="kv"><span class="k">Dual</span><span class="v">${round1(T.dual).toLocaleString()}</span></div>
+     <div class="kv"><span class="k">Single-engine</span><span class="v">${round1(T.hrs-T.me).toLocaleString()}</span></div>
+     <div class="kv"><span class="k">Co-pilot</span><span class="v">${round1(T.cop).toLocaleString()}</span></div>
+     <div class="kv"><span class="k">Multi-engine</span><span class="v">${round1(T.me).toLocaleString()}</span></div>
+     <div class="kv"><span class="k">Instrument (actual)</span><span class="v">${round1(T.ia).toLocaleString()}</span></div>
+     <div class="kv"><span class="k">Simulator</span><span class="v">${round1(T.isim).toLocaleString()}</span></div>
+     <div class="kv"><span class="k">LTC / instructor</span><span class="v">${round1(T.ltc).toLocaleString()}</span></div>
+   </div>
+   <h2>Hours by type</h2>
+   <table><thead><tr><th>Type</th><th class="num">Hours</th><th class="num">Flts</th><th class="num">PIC</th><th>&nbsp;</th><th class="num">Last</th></tr></thead>
+   <tbody>${rows}</tbody></table>
+   <button class="btn ghost noprint" onclick="window.print()">Print / Save PDF</button>`;
+}
+
+
+function monthLabel(k){ const [y,m]=k.split('-'); return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m,10)-1]+' '+y.slice(2); }
+function renderY12(){
+  const now=new Date(), keys=[];
+  for(let i=11;i>=0;i--){ const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    keys.push(d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')); }
+  const list=FL.filter(f=>f.d.slice(0,7)>=keys[0] && f.d.slice(0,7)<=keys[11]).sort((a,b)=>a.d<b.d?-1:1);
+  const T=totals(list);
+  const byM={}; keys.forEach(k=>byM[k]=[]);
+  for(const f of list){ const k=f.d.slice(0,7); if(byM[k])byM[k].push(f); }
+  const mT=keys.map(k=>totals(byM[k]));
+  const maxM=Math.max(0.1,...mT.map(t=>t.hrs));
+  const mrows=keys.map((k,i)=>{ const t=mT[i];
+    return `<tr><td>${monthLabel(k)}</td><td class="num">${t.n||''}</td><td class="num">${t.n?round1(t.hrs):''}</td><td class="num">${t.pic?round1(t.pic):''}</td><td class="num">${t.night?round1(t.night):''}</td>
+      <td style="width:26%"><div class="barwrap"><span class="bar" style="width:${Math.round(t.hrs/maxM*100)}%"></span></div></td></tr>`; }).join('');
+  const byT={}; for(const f of list){ (byT[f.t]=byT[f.t]||[]).push(f); }
+  const trows=Object.keys(byT).map(t=>Object.assign({t:t},totals(byT[t]))).sort((a,b)=>b.hrs-a.hrs)
+    .map(x=>`<tr><td><b>${x.t}</b></td><td class="num">${round1(x.hrs).toLocaleString()}</td><td class="num">${x.n}</td><td class="num">${round1(x.pic)}</td><td class="num">${round1(x.night)}</td><td class="num">${x.to||''}</td><td class="num">${x.ld||''}</td></tr>`).join('');
+  const drows=list.map(f=>{ const i=FL.indexOf(f);
+    const ltc=f.ltc?` <span class="muted">LTC ${f.ltc}</span>`:'';
+    return `<tr class="click" onclick="editFlight(${i})"><td>${f.d}</td><td><b>${f.t}</b></td><td>${f.r||''}</td><td>${f.p||''}</td><td>${f.x||''}${ltc}</td><td class="num">${round1(total(f))}</td></tr>`; }).join('');
+  document.getElementById('v-y12').innerHTML=`
+   <div class="note noprint">Rolling last 12 calendar months: <b>${monthLabel(keys[0])} &ndash; ${monthLabel(keys[11])}</b>. Print for licence renewal or records &mdash; prints on white.</div>
+   <h2>12-month totals</h2>
+   <div class="cards">
+     <div class="card"><div class="big">${round1(T.hrs).toLocaleString()}</div><div class="lbl">Hours</div><div class="sub">${T.n} flights</div></div>
+     <div class="card"><div class="big">${round1(T.pic).toLocaleString()}</div><div class="lbl">PIC</div></div>
+     <div class="card"><div class="big">${round1(T.night).toLocaleString()}</div><div class="lbl">Night</div></div>
+     <div class="card"><div class="big">${round1(T.ia+T.isim).toLocaleString()}</div><div class="lbl">Instrument</div><div class="sub">actual ${round1(T.ia)} / sim ${round1(T.isim)}</div></div>
+   </div>
+   <h2>Breakdown</h2>
+   <div class="grid2">
+     <div class="kv"><span class="k">PIC</span><span class="v">${round1(T.pic).toLocaleString()}</span></div>
+     <div class="kv"><span class="k">Day</span><span class="v">${round1(T.hrs-T.night).toLocaleString()}</span></div>
+     <div class="kv"><span class="k">PICUS</span><span class="v">${round1(T.picus)}</span></div>
+     <div class="kv"><span class="k">Night</span><span class="v">${round1(T.night)}</span></div>
+     <div class="kv"><span class="k">Dual</span><span class="v">${round1(T.dual)}</span></div>
+     <div class="kv"><span class="k">Multi-engine</span><span class="v">${round1(T.me).toLocaleString()}</span></div>
+     <div class="kv"><span class="k">Co-pilot</span><span class="v">${round1(T.cop).toLocaleString()}</span></div>
+     <div class="kv"><span class="k">Single-engine</span><span class="v">${round1(T.hrs-T.me)}</span></div>
+     <div class="kv"><span class="k">Take-offs</span><span class="v">${T.to}</span></div>
+     <div class="kv"><span class="k">Landings</span><span class="v">${T.ld}</span></div>
+     <div class="kv"><span class="k">LTC / instructor</span><span class="v">${round1(T.ltc)}</span></div>
+   </div>
+   <h2>By month</h2>
+   <table><thead><tr><th>Month</th><th class="num">Flts</th><th class="num">Hours</th><th class="num">PIC</th><th class="num">Night</th><th>&nbsp;</th></tr></thead>
+   <tbody>${mrows}</tbody>
+   <tfoot><tr><td>Total</td><td class="num">${T.n}</td><td class="num">${round1(T.hrs).toLocaleString()}</td><td class="num">${round1(T.pic).toLocaleString()}</td><td class="num">${round1(T.night)}</td><td></td></tr></tfoot></table>
+   <h2>By type</h2>
+   <table><thead><tr><th>Type</th><th class="num">Hours</th><th class="num">Flts</th><th class="num">PIC</th><th class="num">Night</th><th class="num">T/O</th><th class="num">Ldg</th></tr></thead><tbody>${trows}</tbody></table>
+   <h2>Flight details &mdash; ${list.length} flights</h2>
+   <table><thead><tr><th>Date</th><th>Type</th><th>Reg</th><th>PIC</th><th>Route</th><th class="num">Hrs</th></tr></thead>
+   <tbody>${drows||'<tr><td colspan=6 class="muted">No flights in the last 12 months</td></tr>'}</tbody>
+   <tfoot><tr><td colspan="5">Total &mdash; ${T.n} flights</td><td class="num">${round1(T.hrs).toLocaleString()}</td></tr></tfoot></table>
+   <button class="btn ghost noprint" onclick="window.print()">Print / Save PDF</button>`;
+}
+
+
+const EXP_ITEMS=[['medical','Class 1 Medical'],['comp6','6-month Competency'],['comp12','12-month Competency'],
+  ['ir','Instrument Rating'],['instr','Instructor Rating']];
+function renderCurr(){
+  const cut=Date.now()-365*864e5;
+  const active=[...new Set(FL.filter(f=>new Date(f.d+'T00:00:00')>=cut).map(f=>f.t))];
+  const last90=inLast(90);
+  let cards='';
+  const types = active.length?active:[...new Set(FL.slice(-30).map(f=>f.t))];
+  for(const t of types){
+    const fs=last90.filter(f=>f.t===t);
+    const to=fs.reduce((a,f)=>a+(f.tod||0)+(f.ton||0),0);
+    const ld=fs.reduce((a,f)=>a+(f.ldd||0)+(f.ldn||0),0);
+    const all=FL.filter(f=>f.t===t); const last=all.reduce((a,f)=>f.d>a?f.d:a,'0'); const ago=daysAgo(last);
+    const ok = to>=3 && ld>=3; const cls = ok?'g':(to>0||ld>0?'y':'r');
+    cards+=`<div class="crow"><span class="dot ${cls}"></span><span class="nm">${t}</span>
+      <span class="meta">${to} T/O &middot; ${ld} Ldg in 90d<br><span class="muted">last flown ${ago>9000?'-':ago+'d ago'}</span></span></div>`;
+  }
+  if(!cards) cards='<div class="muted">No recent flights logged.</div>';
+  let exp='';
+  for(const [k,label] of EXP_ITEMS){
+    const val=META[k]||'';
+    let stat='<span class="muted">not set</span>';
+    if(val){ const days=Math.ceil((new Date(val+'T00:00:00')-Date.now())/864e5);
+      const cls=days<0?'r':(days<30?'r':(days<90?'y':'g'));
+      const dot=`<span class="dot ${cls}" style="display:inline-block;margin-right:5px"></span>`;
+      stat=dot+(days<0?`expired ${-days}d ago`:`${days}d left`); }
+    exp+=`<div class="exp"><label>${label}</label>
+      <input type="date" value="${val}" onchange="setExp('${k}',this.value)">
+      <span class="stat">${stat}</span></div>`;
+  }
+  document.getElementById('v-curr').innerHTML=`
+   <div class="note">Recency rule: minimum 3 take-offs and 3 landings per type in the last 90 days &mdash; a Level D FFS for the type counts (CAR-FCL). Log take-offs &amp; landings on sim sessions too, or they are not counted here. Cards show active types flown in the last year.</div>
+   <h2>Take-off &amp; landing recency (90 days)</h2>${cards}
+   <h2>Licences &amp; ratings &mdash; expiry</h2>
+   <div class="muted" style="margin-bottom:8px">Editable. Red &lt;30d / expired, amber &lt;90d, green otherwise. Saved on this device.</div>
+   ${exp}`;
+}
+function setExp(k,v){ META[k]=v; saveMeta(); renderCurr(); }
+
+function renderLog(){
+  const types=[...new Set(FL.map(f=>f.t))].sort();
+  let f=FL.slice().reverse();
+  if(logFilter.t) f=f.filter(x=>x.t===logFilter.t);
+  if(logFilter.q){ const q=logFilter.q.toLowerCase(); f=f.filter(x=>(x.p+' '+x.c+' '+x.x+' '+x.r+' '+x.t).toLowerCase().includes(q)); }
+  const per=25, pages=Math.max(1,Math.ceil(f.length/per));
+  if(logPage>=pages)logPage=0;
+  const slice=f.slice(logPage*per,logPage*per+per);
+  const rows=slice.map(x=>{ const i=FL.indexOf(x);
+    const ltc=x.ltc?` <span class="muted">LTC ${x.ltc}</span>`:'';
+    return `<tr class="click" onclick="editFlight(${i})"><td>${x.d}</td><td><b>${x.t}</b></td>
+      <td>${x.r||''}</td><td>${x.p||''}</td><td>${x.x||''}${ltc}</td><td class="num">${round1(total(x))}</td></tr>`; }).join('');
+  document.getElementById('v-log').innerHTML=`
+   <div class="search noprint">
+     <input placeholder="Search PIC, route, reg..." value="${logFilter.q}" oninput="logFilter.q=this.value;logPage=0;renderLog()">
+     <select onchange="logFilter.t=this.value;logPage=0;renderLog()">
+       <option value="">All types</option>${types.map(t=>`<option ${t===logFilter.t?'selected':''}>${t}</option>`).join('')}</select>
+   </div>
+   <div class="muted">${f.length} flights</div>
+   <table><thead><tr><th>Date</th><th>Type</th><th>Reg</th><th>PIC</th><th>Route</th><th class="num">Hrs</th></tr></thead>
+   <tbody>${rows||'<tr><td colspan=6 class="muted">No matches</td></tr>'}</tbody></table>
+   <div class="pager noprint"><button ${logPage<=0?'disabled':''} onclick="logPage--;renderLog()">Prev</button>
+     <span class="muted">Page ${logPage+1} / ${pages}</span>
+     <button ${logPage>=pages-1?'disabled':''} onclick="logPage++;renderLog()">Next</button></div>`;
+}
+
+let formState={eng:'ME',role:'p',dn:'d'};
+function renderAdd(f){
+  const edit = !!f;
+  const types=[...new Set(FL.map(x=>x.t))].sort();
+  const v=(k,d='')=>f&&f[k]!=null?f[k]:d;
+  if(edit){
+    formState.eng = sum(f,ME)>0?'ME':'SE';
+    formState.dn = sum(f,NIGHT)>0?'n':'d';
+    formState.role = f.sdp||f.snp||f.mdp||f.mnp?'p':(f.sds||f.sns||f.mds||f.mns?'s':(f.sdd||f.snd||f.mdd||f.mnd?'d':'c'));
+  } else { formState={eng:'ME',role:'p',dn:'d'}; }
+  const hrsVal = edit? round1(total(f)) : '';
+  document.getElementById('v-add').innerHTML=`
+   <div class="f">
+   <h2>${edit?'Edit flight':'Log a flight'}</h2>
+   <div class="frow">
+     <div><label>Date</label><input type="date" id="fd" value="${v('d',new Date().toISOString().slice(0,10))}"></div>
+     <div><label>Type</label><input id="ft" list="tl" value="${v('t')}" oninput="onType()"><datalist id="tl">${types.map(t=>`<option>${t}</option>`).join('')}</datalist></div>
+     <div><label>Reg</label><input id="fr" value="${v('r')}"></div>
+   </div>
+   <div class="frow">
+     <div><label>Pilot in command</label><input id="fp" value="${v('p')}" placeholder="Self or name"></div>
+     <div><label>Student / co-pilot</label><input id="fc" value="${v('c')}"></div>
+   </div>
+   <label>Route / details</label><input id="fx" value="${v('x')}" placeholder="e.g. AUH-ZKW-AUH">
+   <div class="frow">
+     <div><label>Engine</label><div class="seg" id="seg-eng">
+       <button type="button" data-k="SE" onclick="segPick('eng','SE')">Single</button>
+       <button type="button" data-k="ME" onclick="segPick('eng','ME')">Multi</button></div></div>
+     <div><label>Role</label><div class="seg" id="seg-role">
+       <button type="button" data-k="p" onclick="segPick('role','p')">PIC</button>
+       <button type="button" data-k="s" onclick="segPick('role','s')">PICUS</button>
+       <button type="button" data-k="d" onclick="segPick('role','d')">Dual</button>
+       <button type="button" data-k="c" onclick="segPick('role','c')">Co-P</button></div></div>
+   </div>
+   <div class="frow">
+     <div><label>Day / Night</label><div class="seg" id="seg-dn">
+       <button type="button" data-k="d" onclick="segPick('dn','d')">Day</button>
+       <button type="button" data-k="n" onclick="segPick('dn','n')">Night</button></div></div>
+     <div><label>Flight hours</label><input id="fh" type="number" step="0.1" inputmode="decimal" value="${hrsVal}" placeholder="0.0"></div>
+   </div>
+   <div class="frow">
+     <div><label>LTC / instructor hrs</label><input id="fltc" type="number" step="0.1" value="${v('ltc')}"></div>
+     <div><label>Instrument actual</label><input id="fia" type="number" step="0.1" value="${v('ia')}"></div>
+     <div><label>Simulator</label><input id="fis" type="number" step="0.1" value="${v('isim')}"></div>
+   </div>
+   <div class="frow">
+     <div><label>Take-offs (this type)</label><input id="fto" type="number" step="1" value="${edit?((f.tod||0)+(f.ton||0))||'':''}" placeholder="e.g. 1"></div>
+     <div><label>Landings (this type)</label><input id="fld" type="number" step="1" value="${edit?((f.ldd||0)+(f.ldn||0))||'':''}" placeholder="e.g. 1"></div>
+   </div>
+   <button class="btn" onclick="commitFlight()">${edit?'Save changes':'Add flight'}</button>
+   ${edit?'<div class="btnrow"><button class="btn ghost" onclick="cancelEdit()">Cancel</button><button class="btn danger" onclick="deleteFlight()">Delete</button></div>':''}
+   </div>`;
+  ['eng','role','dn'].forEach(g=>paintSeg(g));
+}
+function paintSeg(g){ document.querySelectorAll('#seg-'+g+' button').forEach(b=>b.classList.toggle('on',b.dataset.k===formState[g])); }
+function segPick(g,k){ formState[g]=k; paintSeg(g); }
+function onType(){ const t=document.getElementById('ft').value.trim(); if(t&&typeIsME(t)){formState.eng='ME';} else if(t){formState.eng='SE';} paintSeg('eng'); }
+
+function commitFlight(){
+  const t=document.getElementById('ft').value.trim();
+  const hrs=parseFloat(document.getElementById('fh').value)||0;
+  if(!t){ toast('Enter aircraft type'); return; }
+  const rec={ d:document.getElementById('fd').value, t:t, r:document.getElementById('fr').value.trim(),
+    p:document.getElementById('fp').value.trim(), c:document.getElementById('fc').value.trim(),
+    x:document.getElementById('fx').value.trim() };
+  const prefix = formState.eng==='ME'?'m':'s';
+  if(hrs>0) rec[prefix+(formState.dn==='n'?'n':'d')+formState.role]=round1(hrs);
+  const ltc=parseFloat(document.getElementById('fltc').value)||0; if(ltc)rec.ltc=ltc;
+  const ia=parseFloat(document.getElementById('fia').value)||0; if(ia)rec.ia=ia;
+  const is=parseFloat(document.getElementById('fis').value)||0; if(is)rec.isim=is;
+  const to=parseInt(document.getElementById('fto').value)||0;
+  const ld=parseInt(document.getElementById('fld').value)||0;
+  if(to)rec[formState.dn==='n'?'ton':'tod']=to;
+  if(ld)rec[formState.dn==='n'?'ldn':'ldd']=ld;
+  if(hrs<=0 && !ltc && !ia && !is){ toast('Enter some hours'); return; }
+  if(editIdx>=0){ FL[editIdx]=rec; editIdx=-1; toast('Flight updated'); }
+  else { FL.push(rec); toast('Flight added'); }
+  FL.sort((a,b)=>a.d<b.d?-1:1);
+  save(); go('log');
+}
+function editFlight(i){ editIdx=i; renderAdd(FL[i]); go('add');
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.v==='add')); }
+function cancelEdit(){ editIdx=-1; go('log'); }
+function deleteFlight(){ if(editIdx<0)return; if(!confirm('Delete this flight?'))return;
+  FL.splice(editIdx,1); editIdx=-1; save(); toast('Deleted'); go('log'); }
+
+function renderData(){
+  document.getElementById('v-data').innerHTML=`
+   <div class="note"><b>Back up regularly.</b> This app stores your logbook in this browser only. Export a JSON file to OneDrive after logging flights so nothing is ever lost.</div>
+   <h2>Backup &amp; restore</h2>
+   <button class="btn dark" onclick="exportJSON()">Export logbook (JSON backup)</button>
+   <button class="btn ghost" onclick="exportCSV()">Export CSV (for Excel)</button>
+   <label class="btn ghost" style="display:block;text-align:center;cursor:pointer">Import JSON backup<input type="file" accept=".json" class="hide" onchange="importJSON(this)"></label>
+   <h2>Pilot details (shown in header &amp; printouts)</h2>
+   <div class="f"><div class="frow">
+     <div><label>Name</label><input id="setname" value="${META.pilot||''}"></div>
+     <div><label>Licence no.</label><input id="setlic" value="${META.lic||''}"></div>
+   </div><button class="btn dark" onclick="setPilot()">Save details</button></div>
+   <h2>Reset</h2>
+   <button class="btn danger" onclick="resetSeed()">Delete all flights on this device</button>
+   <div class="muted" style="margin-top:10px">Currently storing <b>${FL.length}</b> flights.</div>`;
+}
+function exportJSON(){
+  META.backupAt=Date.now(); META.backupN=FL.length; saveMeta();
+  dl('logbook-'+new Date().toISOString().slice(0,10)+'.json', JSON.stringify({v:2,flights:FL,meta:META}), 'application/json');
+  renderBackupNudge(); }
+function exportCSV(){
+  const cols=['d','t','r','p','c','x',...ROLE,'ltc','ia','isim','ig','nap','pap','tod','ton','ldd','ldn'];
+  let csv=cols.join(',')+'\n';
+  for(const f of FL){ csv+=cols.map(c=>{ let v=f[c]==null?'':f[c]; v=(''+v).replace(/"/g,'""'); return /[",\n]/.test(v)?`"${v}"`:v; }).join(',')+'\n'; }
+  dl('logbook-'+new Date().toISOString().slice(0,10)+'.csv', csv, 'text/csv');
+}
+function dl(name,data,mime){ const b=new Blob([data],{type:mime}); const u=URL.createObjectURL(b);
+  const a=document.createElement('a'); a.href=u; a.download=name; a.click(); URL.revokeObjectURL(u); toast('Downloaded '+name); }
+function importJSON(inp){ const file=inp.files[0]; if(!file)return; const rd=new FileReader();
+  rd.onload=()=>{ try{ const d=JSON.parse(rd.result);
+    if(Array.isArray(d)){ FL=d; }
+    else if(d&&Array.isArray(d.flights)){ FL=d.flights; if(d.meta)META=d.meta; saveMeta(); }
+    else throw 0;
+    FL.sort((a,b)=>a.d<b.d?-1:1); save(); toast('Imported '+FL.length+' flights'); go('dash'); }
+    catch(e){ toast('Invalid backup file'); } }; rd.readAsText(file); }
+function resetSeed(){ if(!confirm('Delete ALL flights stored on this device? Export a backup first.'))return;
+  FL=JSON.parse(JSON.stringify(SEED)); localStorage.setItem('fl_seed_version',SEED_VERSION); save(); toast('Reset done'); go('dash'); }
+
+load(); go('dash'); renderBackupNudge(); renderPilot();
+if('serviceWorker' in navigator && location.protocol==='https:'){ navigator.serviceWorker.register('sw.js'); }
+</script>
+</body>
+</html>
