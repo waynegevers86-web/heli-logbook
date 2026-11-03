@@ -1,5 +1,5 @@
 // cache-first app shell; bump VERSION on every app update to push it to installed phones
-const VERSION = 'logbook-v2';
+const VERSION = 'logbook-v3';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', e => {

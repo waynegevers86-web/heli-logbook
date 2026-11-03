@@ -154,7 +154,7 @@ function load(){
   }catch(e){ FL=JSON.parse(JSON.stringify(SEED)); }
   try{ META=JSON.parse(localStorage.getItem('fl_meta')||'{}'); }catch(e){ META={}; }
 }
-function save(){ try{ localStorage.setItem('fl_flights',JSON.stringify(FL)); SY.dirty=1; saveSync(); }catch(e){} }
+function save(){ try{ localStorage.setItem('fl_flights',JSON.stringify(FL)); SY.dirty=1; saveSync(); }catch(e){} autoPushSoon(); }
 function saveSync(){ try{ localStorage.setItem('fl_sync',JSON.stringify(SY)); }catch(e){} }
 function saveMeta(){ try{ localStorage.setItem('fl_meta',JSON.stringify(META)); }catch(e){} }
 
@@ -196,6 +196,7 @@ function renderBackupNudge(){
   const el=document.getElementById('bkstat'); if(!el)return;
   // Once sync is set up it IS the backup, and "unpushed" is the thing worth nagging about.
   if(ghCfgOk()){
+    if(SY.conflict&&SY.dirty){ el.innerHTML='<span style="color:var(--warn)">sync conflict &mdash; Data tab</span>'; return; }
     if(SY.dirty){ el.innerHTML='<span style="color:var(--warn)">not synced &mdash; Data tab</span>'; return; }
     if(SY.at){ const d=Math.floor((Date.now()-SY.at)/864e5); el.textContent='synced '+(d===0?'today':d+'d ago'); return; }
     el.innerHTML='<span style="color:var(--warn)">never synced &mdash; Data tab</span>'; return;
@@ -508,6 +509,7 @@ function ghSaveCfg(){
        path:g('gh_path')||GH_DEFAULTS.path, branch:g('gh_branch')||GH_DEFAULTS.branch };
   try{ localStorage.setItem('fl_gh',JSON.stringify(GH)); }catch(e){}
   toast('Sync settings saved'); renderData(); renderBackupNudge();
+  if(ghCfgOk() && !SY.sha && confirm('Load your logbook from GitHub now?\n\nThis REPLACES the flights on this device with the cloud copy. After this, the app syncs by itself.')) ghPull();
 }
 function ghForget(){
   if(!confirm('Remove the saved token from this device? Your flights stay put.'))return;
@@ -567,6 +569,45 @@ async function ghPush(){
     toast('Pushed '+FL.length+' flights'); renderBackupNudge(); renderData();
   }catch(e){ setSyncMsg('Push failed (offline?): '+(e.message||e),1); }
 }
+
+/* ---- Auto-sync ---------------------------------------------------------
+   No buttons needed once the token is set: every save pushes a few seconds
+   later, and opening / returning to the app pulls if the cloud moved and this
+   device has nothing unpushed. Same sha guard as the buttons, so the worst
+   case is a "sync conflict" nag, never a silent overwrite. */
+let autoT=null, autoBusy=false;
+function autoPushSoon(){ if(!ghCfgOk()||!SY.sha)return; clearTimeout(autoT); autoT=setTimeout(autoSync,3000); }
+async function autoSync(){
+  if(!ghCfgOk()||!SY.sha||autoBusy||!navigator.onLine)return;
+  autoBusy=true;
+  try{
+    if(SY.dirty){
+      const body={ message:'logbook: '+FL.length+' flights, '+round1(totals(FL).hrs)+' hrs',
+                   content:b64enc(JSON.stringify({v:2,flights:FL,meta:META})), branch:GH.branch||'main', sha:SY.sha };
+      const r=await ghApi(ghUrl(),{method:'PUT',body:JSON.stringify(body)});
+      if(r.status===409||r.status===422){ SY.conflict=1; saveSync(); }
+      else if(r.ok){ const j=await r.json(); SY={sha:j.content.sha,at:Date.now(),n:FL.length,dirty:0}; saveSync();
+        META.backupAt=Date.now(); META.backupN=FL.length; saveMeta(); }
+    } else {
+      const r=await ghApi(ghUrl()+'?ref='+ghRef());
+      if(r.ok){ const j=await r.json();
+        if(j.sha!==SY.sha){
+          const d=JSON.parse(b64dec(j.content));
+          if(d&&Array.isArray(d.flights)&&!SY.dirty){
+            FL=d.flights; if(d.meta)META=d.meta; FL.sort((a,b)=>a.d<b.d?-1:1);
+            try{ localStorage.setItem('fl_flights',JSON.stringify(FL)); }catch(e){}
+            saveMeta(); SY={sha:j.sha,at:Date.now(),n:FL.length,dirty:0}; saveSync();
+            toast('Synced '+FL.length+' flights'); refreshView();
+          }
+        } else { SY.at=Date.now(); saveSync(); }
+      }
+    }
+  }catch(e){}
+  autoBusy=false; renderBackupNudge(); renderPilot();
+}
+function refreshView(){ const on=document.querySelector('.tab.on'), v=on&&on.dataset.v?on.dataset.v:'dash'; if(v!=='add') go(v); }  // never wipe a half-typed flight
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') autoSync(); });
+window.addEventListener('online',()=>autoSync());
 
 function esc(s){ return (s==null?'':''+s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
@@ -639,8 +680,9 @@ function importJSON(inp){ const file=inp.files[0]; if(!file)return; const rd=new
 function resetSeed(){ if(!confirm('Delete ALL flights stored on this device? Export a backup first.'))return;
   FL=JSON.parse(JSON.stringify(SEED)); localStorage.setItem('fl_seed_version',SEED_VERSION); save(); toast('Reset done'); go('dash'); }
 
-load(); go('dash'); renderBackupNudge(); renderPilot();
-if('serviceWorker' in navigator && location.protocol==='https:'){ navigator.serviceWorker.register('sw.js'); }
+load(); go('dash'); renderBackupNudge(); renderPilot(); autoSync();
+if('serviceWorker' in navigator && location.protocol==='https:'){ navigator.serviceWorker.register('sw.js');
+  let reloaded=false; navigator.serviceWorker.addEventListener('controllerchange',()=>{ if(reloaded)return; reloaded=true; location.reload(); }); }
 </script>
 </body>
 </html>
