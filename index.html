@@ -141,9 +141,11 @@ const ME=['mdd','mdp','mds','mdc','mnd','mnp','mns','mnc'];
 const PIC=['sdp','snp','mdp','mnp'], PICUS=['sds','sns','mds','mns'],
       DUAL=['sdd','snd','mdd','mnd'], COP=['sdc','snc','mdc','mnc'];
 
-let FL=[], META={}, logPage=0, logFilter={q:'',t:''}, editIdx=-1;
+let FL=[], META={}, GH={}, SY={}, logPage=0, logFilter={q:'',t:''}, editIdx=-1;
 
 function load(){
+  try{ GH=JSON.parse(localStorage.getItem('fl_gh')||'{}'); }catch(e){ GH={}; }
+  try{ SY=JSON.parse(localStorage.getItem('fl_sync')||'{}'); }catch(e){ SY={}; }
   try{
     let v=parseInt(localStorage.getItem('fl_seed_version')||'0');
     let s=localStorage.getItem('fl_flights');
@@ -152,7 +154,8 @@ function load(){
   }catch(e){ FL=JSON.parse(JSON.stringify(SEED)); }
   try{ META=JSON.parse(localStorage.getItem('fl_meta')||'{}'); }catch(e){ META={}; }
 }
-function save(){ try{ localStorage.setItem('fl_flights',JSON.stringify(FL)); }catch(e){} }
+function save(){ try{ localStorage.setItem('fl_flights',JSON.stringify(FL)); SY.dirty=1; saveSync(); }catch(e){} }
+function saveSync(){ try{ localStorage.setItem('fl_sync',JSON.stringify(SY)); }catch(e){} }
 function saveMeta(){ try{ localStorage.setItem('fl_meta',JSON.stringify(META)); }catch(e){} }
 
 const sum=(f,keys)=>keys.reduce((a,k)=>a+(f[k]||0),0);
@@ -179,15 +182,24 @@ function go(v){
 }
 function renderPilot(){
   const el=document.getElementById('hpilot');
-  el.textContent = META.pilot ? META.pilot+(META.lic?' \u00b7 Lic '+META.lic:'')+' \u00b7 ' : '';
+  // META.lic is the SA licence (kept under its old key so older backups still load)
+  const lic=[META.lic?'SA '+META.lic:'', META.licUAE?'UAE '+META.licUAE:''].filter(Boolean).join(' \u00b7 ');
+  el.textContent = META.pilot ? META.pilot+(lic?' \u00b7 '+lic:'')+' \u00b7 ' : '';
 }
 function setPilot(){
   META.pilot=document.getElementById('setname').value.trim();
   META.lic=document.getElementById('setlic').value.trim();
+  META.licUAE=document.getElementById('setlicuae').value.trim();
   saveMeta(); renderPilot(); toast('Saved');
 }
 function renderBackupNudge(){
   const el=document.getElementById('bkstat'); if(!el)return;
+  // Once sync is set up it IS the backup, and "unpushed" is the thing worth nagging about.
+  if(ghCfgOk()){
+    if(SY.dirty){ el.innerHTML='<span style="color:var(--warn)">not synced &mdash; Data tab</span>'; return; }
+    if(SY.at){ const d=Math.floor((Date.now()-SY.at)/864e5); el.textContent='synced '+(d===0?'today':d+'d ago'); return; }
+    el.innerHTML='<span style="color:var(--warn)">never synced &mdash; Data tab</span>'; return;
+  }
   if(!META.backupAt){ el.innerHTML='<span style="color:var(--warn)">no backup yet &mdash; Data tab</span>'; return; }
   const days=Math.floor((Date.now()-META.backupAt)/864e5);
   const fresh=FL.length-(META.backupN||0);
@@ -447,17 +459,159 @@ function cancelEdit(){ editIdx=-1; go('log'); }
 function deleteFlight(){ if(editIdx<0)return; if(!confirm('Delete this flight?'))return;
   FL.splice(editIdx,1); editIdx=-1; save(); toast('Deleted'); go('log'); }
 
+/* ---- GitHub sync -------------------------------------------------------
+   The logbook is one JSON blob in a private repo. GitHub's Contents API makes
+   you send the sha of the blob you are replacing, so if the other device
+   pushed since this one last synced, GitHub itself rejects the write (409).
+   That is the revision guard - a stale device can't overwrite newer flights. */
+const GH_DEFAULTS={owner:'waynegevers86-web',repo:'second-brain',path:'aviation/data/logbook.json',branch:'main'};
+function ghCfgOk(){ return !!(GH.token&&GH.owner&&GH.repo&&GH.path); }
+function ghUrl(){ return 'https://api.github.com/repos/'+encodeURIComponent(GH.owner)+'/'+encodeURIComponent(GH.repo)
+  +'/contents/'+GH.path.split('/').map(encodeURIComponent).join('/'); }
+function ghRef(){ return encodeURIComponent(GH.branch||'main'); }
+function ghApi(url,opts){
+  opts=opts||{};
+  return fetch(url,Object.assign({cache:'no-store'},opts,{headers:Object.assign({
+    'Authorization':'Bearer '+GH.token,
+    'Accept':'application/vnd.github+json',
+    'X-GitHub-Api-Version':'2022-11-28'
+  },opts.headers||{})}));
+}
+async function ghErr(r){
+  let m=''; try{ const j=await r.json(); m=j.message||''; }catch(e){}
+  if(r.status===401) return 'GitHub rejected the token (401) - expired, mistyped, or revoked.';
+  if(r.status===403) return 'GitHub refused (403). The token most likely lacks Contents: Read and write on this repo. '+m;
+  if(r.status===404) return 'Not found (404) - check owner / repo / path / branch, and that the token grants access to this repo.';
+  return 'GitHub error '+r.status+(m?': '+m:'');
+}
+// base64 both ways, UTF-8 safe. Chunked because the logbook is ~250KB and
+// String.fromCharCode(...bytes) blows the call stack well before that.
+function b64enc(str){
+  const b=new TextEncoder().encode(str); let s='', CH=0x8000;
+  for(let i=0;i<b.length;i+=CH) s+=String.fromCharCode.apply(null,b.subarray(i,i+CH));
+  return btoa(s);
+}
+function b64dec(b64){
+  const bin=atob((b64||'').replace(/\s/g,''));
+  const b=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) b[i]=bin.charCodeAt(i);
+  return new TextDecoder().decode(b);
+}
+function setSyncMsg(m,warn){
+  const el=document.getElementById('syncmsg'); if(!el)return;
+  el.innerHTML=warn?'<span style="color:var(--warn)">'+m+'</span>':m;
+}
+function ghSaveCfg(){
+  const g=id=>{ const e=document.getElementById(id); return e?e.value.trim():''; };
+  const tok=g('gh_token');
+  GH={ token: tok||GH.token||'', owner:g('gh_owner')||GH_DEFAULTS.owner, repo:g('gh_repo')||GH_DEFAULTS.repo,
+       path:g('gh_path')||GH_DEFAULTS.path, branch:g('gh_branch')||GH_DEFAULTS.branch };
+  try{ localStorage.setItem('fl_gh',JSON.stringify(GH)); }catch(e){}
+  toast('Sync settings saved'); renderData(); renderBackupNudge();
+}
+function ghForget(){
+  if(!confirm('Remove the saved token from this device? Your flights stay put.'))return;
+  delete GH.token; try{ localStorage.setItem('fl_gh',JSON.stringify(GH)); }catch(e){}
+  toast('Token removed'); renderData(); renderBackupNudge();
+}
+async function ghCheck(){
+  if(!ghCfgOk()){ setSyncMsg('Set up sync first.',1); return; }
+  setSyncMsg('Checking...');
+  try{
+    const r=await ghApi(ghUrl()+'?ref='+ghRef());
+    if(r.status===404){ setSyncMsg('No logbook in the repo yet - Push to create it.',1); return; }
+    if(!r.ok){ setSyncMsg(await ghErr(r),1); return; }
+    const j=await r.json();
+    if(j.sha===SY.sha) setSyncMsg(SY.dirty?'Cloud matches your last sync, but this device has unpushed changes - Push.':'In sync.',SY.dirty?1:0);
+    else setSyncMsg(SY.dirty
+      ? 'BOTH sides changed - the cloud moved AND this device has unpushed changes. Export a JSON backup, then decide which copy wins.'
+      : 'Cloud is newer than this device - Pull.',1);
+  }catch(e){ setSyncMsg('Check failed (offline?): '+(e.message||e),1); }
+}
+async function ghPull(){
+  if(!ghCfgOk()){ setSyncMsg('Set up sync first.',1); return; }
+  if(SY.dirty && !confirm('This device has changes that were never pushed.\n\nPulling REPLACES them with the cloud copy. Export a JSON backup first if you are unsure.\n\nPull anyway?')) return;
+  setSyncMsg('Pulling...');
+  try{
+    const r=await ghApi(ghUrl()+'?ref='+ghRef());
+    if(r.status===404){ setSyncMsg('No logbook in the repo yet - Push to create it.',1); return; }
+    if(!r.ok){ setSyncMsg(await ghErr(r),1); return; }
+    const j=await r.json();
+    const d=JSON.parse(b64dec(j.content));
+    if(!d||!Array.isArray(d.flights)){ setSyncMsg('That file is not a logbook backup - check the path.',1); return; }
+    FL=d.flights; if(d.meta) META=d.meta;
+    FL.sort((a,b)=>a.d<b.d?-1:1);
+    try{ localStorage.setItem('fl_flights',JSON.stringify(FL)); }catch(e){}
+    saveMeta();
+    SY={sha:j.sha,at:Date.now(),n:FL.length,dirty:0}; saveSync();
+    toast('Pulled '+FL.length+' flights'); renderBackupNudge(); go('dash');
+  }catch(e){ setSyncMsg('Pull failed (offline?): '+(e.message||e),1); }
+}
+async function ghPush(){
+  if(!ghCfgOk()){ setSyncMsg('Set up sync first.',1); return; }
+  setSyncMsg('Pushing...');
+  try{
+    const body={ message:'logbook: '+FL.length+' flights, '+round1(totals(FL).hrs)+' hrs',
+                 content:b64enc(JSON.stringify({v:2,flights:FL,meta:META})), branch:GH.branch||'main' };
+    if(SY.sha) body.sha=SY.sha;
+    const r=await ghApi(ghUrl(),{method:'PUT',body:JSON.stringify(body)});
+    if(r.status===409||r.status===422){
+      setSyncMsg('CONFLICT - the cloud copy changed since this device last synced, so your other device has flights this one has not seen. '
+        +'Nothing was overwritten. Export a JSON backup, then Pull to take the cloud copy.',1);
+      return;
+    }
+    if(!r.ok){ setSyncMsg(await ghErr(r),1); return; }
+    const j=await r.json();
+    SY={sha:j.content.sha,at:Date.now(),n:FL.length,dirty:0}; saveSync();
+    META.backupAt=Date.now(); META.backupN=FL.length; saveMeta();  // a push IS a backup
+    toast('Pushed '+FL.length+' flights'); renderBackupNudge(); renderData();
+  }catch(e){ setSyncMsg('Push failed (offline?): '+(e.message||e),1); }
+}
+
+function esc(s){ return (s==null?'':''+s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
 function renderData(){
+  const cfg=ghCfgOk(), g=k=>esc(GH[k]||GH_DEFAULTS[k]||'');
+  const synced = SY.at ? new Date(SY.at).toISOString().slice(0,16).replace('T',' ')+' UTC' : 'never';
   document.getElementById('v-data').innerHTML=`
-   <div class="note"><b>Back up regularly.</b> This app stores your logbook in this browser only. Export a JSON file to OneDrive after logging flights so nothing is ever lost.</div>
+   <div class="note"><b>Each device keeps its own copy.</b> Flights live in this browser's storage. Sync below to share them
+   between your phone and laptop through your private GitHub repo, and keep exporting a JSON file now and then as a cold backup.</div>
+
+   <h2>Sync across devices</h2>
+   <div class="muted" style="margin-bottom:8px">Status: <b>${cfg?(SY.dirty?'unpushed changes on this device':'clean'):'not set up'}</b>
+     &middot; last sync ${esc(synced)} &middot; ${SY.n||0} flights at that point &middot; ${FL.length} here now.</div>
+   <div id="syncmsg" class="muted" style="margin:8px 0;min-height:1.2em"></div>
+   ${cfg?`<button class="btn dark" onclick="ghPush()">Push this device to GitHub</button>
+   <button class="btn ghost" onclick="ghPull()">Pull from GitHub (replaces this device)</button>
+   <button class="btn ghost" onclick="ghCheck()">Check which side is newer</button>`:''}
+
+   <h2>Sync settings</h2>
+   <div class="note">The token is stored in this browser only and is never written into this file. Use a
+   <b>fine-grained</b> personal access token limited to the one repo, with <b>Contents: Read and write</b> and nothing else,
+   and give it an expiry date. Anyone with this device unlocked can read it.</div>
+   <div class="f">
+   <div class="grid2">
+     <div><label>Owner</label><input id="gh_owner" value="${g('owner')}"></div>
+     <div><label>Repo</label><input id="gh_repo" value="${g('repo')}"></div>
+   </div>
+   <div class="grid2">
+     <div><label>Path in repo</label><input id="gh_path" value="${g('path')}"></div>
+     <div><label>Branch</label><input id="gh_branch" value="${g('branch')}"></div>
+   </div>
+   <div><label>Token</label><input id="gh_token" type="password" autocomplete="off" placeholder="${GH.token?'saved - leave blank to keep it':'github_pat_...'}"></div>
+   <button class="btn dark" onclick="ghSaveCfg()">Save sync settings</button>
+   ${GH.token?`<button class="btn ghost" onclick="ghForget()">Forget token on this device</button>`:''}
+   </div>
+
    <h2>Backup &amp; restore</h2>
    <button class="btn dark" onclick="exportJSON()">Export logbook (JSON backup)</button>
    <button class="btn ghost" onclick="exportCSV()">Export CSV (for Excel)</button>
    <label class="btn ghost" style="display:block;text-align:center;cursor:pointer">Import JSON backup<input type="file" accept=".json" class="hide" onchange="importJSON(this)"></label>
    <h2>Pilot details (shown in header &amp; printouts)</h2>
    <div class="f"><div class="frow">
-     <div><label>Name</label><input id="setname" value="${META.pilot||''}"></div>
-     <div><label>Licence no.</label><input id="setlic" value="${META.lic||''}"></div>
+     <div><label>Name</label><input id="setname" value="${esc(META.pilot)}"></div>
+     <div><label>SA licence no. (SACAA)</label><input id="setlic" value="${esc(META.lic)}"></div>
+     <div><label>UAE licence no. (GCAA)</label><input id="setlicuae" value="${esc(META.licUAE)}"></div>
    </div><button class="btn dark" onclick="setPilot()">Save details</button></div>
    <h2>Reset</h2>
    <button class="btn danger" onclick="resetSeed()">Delete all flights on this device</button>
