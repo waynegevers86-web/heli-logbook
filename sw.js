@@ -1,5 +1,5 @@
 // cache-first app shell; bump VERSION on every app update to push it to installed phones
-const VERSION = 'logbook-v1';
+const VERSION = 'logbook-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -11,5 +11,7 @@ self.addEventListener('activate', e => {
     .then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', e => {
+  // only the app shell is cached; GitHub sync calls (cross-origin) always go to the network
+  if (e.request.method !== 'GET' || new URL(e.request.url).origin !== self.location.origin) return;
   e.respondWith(caches.match(e.request, {ignoreSearch: true}).then(hit => hit || fetch(e.request)));
 });
