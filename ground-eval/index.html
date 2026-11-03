@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CA 61-19 Ground Evaluation</title>
+<meta name="theme-color" content="#111110">
+<style>
+:root{--bg:#0c0c0b;--card:#161615;--inset:#0f0f0e;--edge:#2c2c2a;--ink:#f2f1ec;--muted:#9a988f;--accent:#3d6bd8;--warn:#d9a441;--ok:#3fae6a;--bad:#d9534f;}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){--bg:#f4f3ef;--card:#fff;--inset:#f8f7f3;--edge:#d6d4cc;--ink:#1a1a18;--muted:#6b6960;}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+.wrap{max-width:640px;margin:0 auto;padding:16px}
+h1{font-size:20px;margin:6px 0 2px;letter-spacing:.02em}
+.sub{color:var(--muted);font-size:13px;margin-bottom:14px}
+.card{background:var(--card);border:1px solid var(--edge);border-radius:10px;padding:14px;margin:12px 0}
+h2{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 10px}
+label{display:block;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);margin:10px 0 4px;font-weight:700}
+input[type=text],input[type=tel],input[type=date],input[type=number]{width:100%;border:1px solid var(--edge);border-radius:6px;padding:10px;font:inherit;color:var(--ink);background:var(--inset)}
+.row{display:flex;gap:10px;flex-wrap:wrap}.row>div{flex:1;min-width:130px}
+.asp{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--edge)}
+.asp:first-of-type{border-top:0}
+.asp span{flex:1;font-size:14px}
+.seg{display:flex;border:1px solid var(--edge);border-radius:6px;overflow:hidden;flex:none}
+.seg button{border:0;background:var(--inset);color:var(--muted);padding:8px 12px;font:inherit;font-weight:700;cursor:pointer}
+.seg button.on[data-v=C]{background:var(--ok);color:#fff}.seg button.on[data-v=NC]{background:var(--bad);color:#fff}
+.pad{position:relative;border:1px dashed var(--edge);border-radius:8px;background:#fff;touch-action:none;height:150px}
+.pad canvas{width:100%;height:100%;display:block;border-radius:8px}
+.pad .hint{position:absolute;left:10px;bottom:6px;color:#999;font-size:12px;pointer-events:none}
+.btn{display:block;width:100%;border:1px solid var(--edge);border-radius:8px;padding:13px;font:inherit;font-weight:700;background:var(--inset);color:var(--ink);cursor:pointer;margin-top:10px;text-align:center}
+.btn.dark{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.small{display:inline-block;width:auto;padding:6px 12px;margin-top:6px;font-size:13px}
+.note{border:1px solid #6b5420;background:rgba(217,164,65,.08);color:var(--warn);border-radius:8px;padding:10px 12px;font-size:13px}
+.muted{color:var(--muted);font-size:13px}
+#msg{min-height:1.2em;margin-top:8px;font-size:14px}
+.hide{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>CA 61-19 &middot; Ground evaluation</h1>
+  <div class="sub">Fills and signs page 2 of the official SACAA form CA 61-19 (26 Aug 2025). Nothing is uploaded anywhere &mdash; the PDF is built on this device.</div>
+
+  <div class="card">
+    <h2>Start from</h2>
+    <div class="muted" id="basemsg">The blank official form.</div>
+    <label class="btn small" style="cursor:pointer">Continue a PDF someone already signed<input id="base" type="file" accept="application/pdf" class="hide"></label>
+  </div>
+
+  <div class="card">
+    <h2>Section 1 &mdash; Ground evaluation (SA designated flight examiner)</h2>
+    <div id="aspects"></div>
+    <button class="btn small" type="button" onclick="allC()">Mark all competent</button>
+    <div class="row">
+      <div><label>Examiner licence number</label><input id="exlic" type="text" autocomplete="off"></div>
+      <div><label>Phone number</label><input id="exphone" type="tel"></div>
+    </div>
+    <div class="row">
+      <div><label>Examiner name</label><input id="exname" type="text" autocapitalize="characters"></div>
+      <div><label>Date</label><input id="exdate" type="date"></div>
+    </div>
+    <label>Examiner signature</label>
+    <div class="pad"><canvas id="exsig"></canvas><div class="hint">Sign here with your finger</div></div>
+    <button class="btn small" type="button" onclick="clearPad('exsig')">Clear signature</button>
+  </div>
+
+  <div class="card">
+    <h2>Experience &amp; applicant signature</h2>
+    <div class="row">
+      <div><label>Total PIC</label><input id="pic" type="text" inputmode="decimal"></div>
+      <div><label>Grand total</label><input id="gt" type="text" inputmode="decimal"></div>
+      <div><label>Total instrument</label><input id="ifr" type="text" inputmode="decimal"></div>
+    </div>
+    <div class="row">
+      <div><label>Applicant name</label><input id="apname" type="text" autocapitalize="characters"></div>
+      <div><label>Date</label><input id="apdate" type="date"></div>
+    </div>
+    <label>Applicant signature</label>
+    <div class="pad"><canvas id="apsig"></canvas><div class="hint">Sign here with your finger</div></div>
+    <button class="btn small" type="button" onclick="clearPad('apsig')">Clear signature</button>
+  </div>
+
+  <div class="note">Only what you fill in is written onto the form, so the examiner and the applicant can each sign on their own phone: the first one downloads the PDF and sends it on, the second opens this page, taps <b>Continue a PDF</b>, adds their part.</div>
+  <button class="btn dark" id="go" type="button" onclick="build()">Create signed PDF</button>
+  <div id="msg" class="muted"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script>
+/* Page-2 coordinates in PDF points, measured from the TOP of the official
+   CA 61-19 (26 Aug 2025) A4 page with pdftotext -bbox + a 100dpi render.
+   A different form revision moves these: re-measure before trusting it. */
+const PAGE_H=842.04;
+const ASPECTS=[
+  ['Knowledge of CAR/CATS, AIP, Supplements, NOTAM and ATS flight plan',189.3],
+  ['Interpretation of METAR, TAF, SIGWX and synoptic charts',206.8],
+  ['Understanding of SID, STAR, APCH and ENR charts',224.3],
+  ['Practical application of all-weather operations',241.9],
+  ['Knowledge of flight planning and aircraft performance',259.4],
+  ['Technical knowledge of aircraft (POH, AFM as applicable)',276.8]];
+const COL={C:494,NC:522.5};
+const BOX={exlic:[160,346.9],exphone:[378,346.9],pic:[117,505.4],gt:[266,505.4],ifr:[461,505.4]};
+const SIGROW={ex:[379.4,422],ap:[533.5,576]};   // top, bottom of the signature boxes
+const SIGCOL={sig:[52,212],name:[212,374],date:[374,536]};
+
+const state={};
+document.getElementById('aspects').innerHTML=ASPECTS.map((a,i)=>
+  `<div class="asp"><span>${a[0]}</span><div class="seg" data-i="${i}">
+     <button type="button" data-v="C">C</button><button type="button" data-v="NC">NC</button></div></div>`).join('');
+document.querySelectorAll('.seg').forEach(seg=>seg.addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return; const i=seg.dataset.i;
+  state[i]= state[i]===b.dataset.v ? undefined : b.dataset.v;
+  seg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.v===state[i]));
+}));
+function allC(){ document.querySelectorAll('.seg').forEach(seg=>{ state[seg.dataset.i]='C';
+  seg.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.v==='C')); }); }
+
+const today=new Date().toISOString().slice(0,10);
+document.getElementById('exdate').value=today; document.getElementById('apdate').value=today;
+// optional pre-fill from the link: ?name=...&pic=...&gt=...&ifr=...
+const qp=new URLSearchParams(location.search);
+[['name','apname'],['pic','pic'],['gt','gt'],['ifr','ifr']].forEach(([k,id])=>{ if(qp.get(k)) document.getElementById(id).value=qp.get(k); });
+
+/* signature pads */
+const pads={};
+function setupPad(id){
+  const c=document.getElementById(id), ctx=c.getContext('2d'); const p={c,ctx,inked:false};
+  const size=()=>{ const r=c.getBoundingClientRect(), d=window.devicePixelRatio||1;
+    const keep=p.inked?c.toDataURL():null;
+    c.width=r.width*d; c.height=r.height*d; ctx.setTransform(d,0,0,d,0,0);
+    ctx.lineWidth=2.4; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle='#0b1f6b';
+    if(keep){ const im=new Image(); im.onload=()=>ctx.drawImage(im,0,0,r.width,r.height); im.src=keep; } };
+  size(); window.addEventListener('resize',size);
+  let down=false,last=null;
+  const pt=e=>{ const r=c.getBoundingClientRect(); return [e.clientX-r.left,e.clientY-r.top]; };
+  c.addEventListener('pointerdown',e=>{ down=true; last=pt(e); c.setPointerCapture(e.pointerId); e.preventDefault(); });
+  c.addEventListener('pointermove',e=>{ if(!down)return; const q=pt(e);
+    ctx.beginPath(); ctx.moveTo(last[0],last[1]); ctx.lineTo(q[0],q[1]); ctx.stroke(); last=q; p.inked=true; });
+  ['pointerup','pointercancel','pointerleave'].forEach(t=>c.addEventListener(t,()=>{down=false;}));
+  pads[id]=p;
+}
+function clearPad(id){ const p=pads[id]; p.ctx.clearRect(0,0,p.c.width,p.c.height); p.inked=false; }
+setupPad('exsig'); setupPad('apsig');
+
+/* trim the drawn signature to its ink so it fills the form box */
+function trimmedPng(p){
+  const {c}=p, w=c.width, h=c.height, d=p.ctx.getImageData(0,0,w,h).data;
+  let x0=w,y0=h,x1=0,y1=0;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){ if(d[(y*w+x)*4+3]>0){ if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; } }
+  if(x1<x0) return null;
+  const pad=6; x0=Math.max(0,x0-pad); y0=Math.max(0,y0-pad); x1=Math.min(w,x1+pad); y1=Math.min(h,y1+pad);
+  const o=document.createElement('canvas'); o.width=x1-x0; o.height=y1-y0;
+  o.getContext('2d').drawImage(c,x0,y0,o.width,o.height,0,0,o.width,o.height);
+  return o.toDataURL('image/png');
+}
+
+let basePdf=null;
+document.getElementById('base').addEventListener('change',async e=>{
+  const f=e.target.files[0]; if(!f)return; basePdf=new Uint8Array(await f.arrayBuffer());
+  document.getElementById('basemsg').textContent='Continuing: '+f.name;
+});
+
+const v=id=>document.getElementById(id).value.trim();
+const dmy=s=>s?s.split('-').reverse().join('/'):'';
+function say(m,warn){ const el=document.getElementById('msg'); el.textContent=m; el.style.color=warn?'var(--warn)':''; }
+
+async function build(){
+  try{
+    say('Building PDF...');
+    const {PDFDocument,StandardFonts,rgb}=PDFLib;
+    const bytes=basePdf||new Uint8Array(await (await fetch('CA_61-19.pdf',{cache:'no-store'})).arrayBuffer());
+    const doc=await PDFDocument.load(bytes);
+    if(doc.getPageCount()<2){ say('That PDF has no page 2 - is it the CA 61-19?',1); return; }
+    const pg=doc.getPage(1), font=await doc.embedFont(StandardFonts.Helvetica), bold=await doc.embedFont(StandardFonts.HelveticaBold);
+    const ink=rgb(0.04,0.12,0.42);
+    const text=(s,x,top,size=10,f=font)=>{ if(s) pg.drawText(s,{x,y:PAGE_H-top-8.6,size,font:f,color:ink}); };
+    const centred=(s,col,top,size=10,f=font)=>{ if(!s)return; let sz=size; while(f.widthOfTextAtSize(s,sz)>col[1]-col[0]-8 && sz>6) sz-=0.5;
+      const w=f.widthOfTextAtSize(s,sz); pg.drawText(s,{x:(col[0]+col[1]-w)/2,y:PAGE_H-top,size:sz,font:f,color:ink}); };
+    let wrote=0;
+    ASPECTS.forEach((a,i)=>{ const m=state[i]; if(!m)return; const w=bold.widthOfTextAtSize('X',10);
+      text('X',COL[m]-w/2,a[1],10,bold); wrote++; });
+    for(const id in BOX){ const s=v(id); if(s){ text(s,BOX[id][0],BOX[id][1]); wrote++; } }
+    for(const who of ['ex','ap']){
+      const [t,b]=SIGROW[who], name=v(who+'name').toUpperCase(), sigP=pads[who+'sig'];
+      if(name){ centred(name,SIGCOL.name,(t+b)/2+4); wrote++; }
+      if(name||sigP.inked){ centred(dmy(v(who+'date')),SIGCOL.date,(t+b)/2+4); }
+      if(sigP.inked){ const png=await doc.embedPng(trimmedPng(sigP));
+        const bw=SIGCOL.sig[1]-SIGCOL.sig[0]-10, bh=b-t-6, k=Math.min(bw/png.width,bh/png.height);
+        const w=png.width*k, h=png.height*k;
+        pg.drawImage(png,{x:(SIGCOL.sig[0]+SIGCOL.sig[1]-w)/2,y:PAGE_H-b+3+(bh-h)/2,width:w,height:h}); wrote++; }
+    }
+    if(!wrote){ say('Nothing filled in yet.',1); return; }
+    const exInk=pads.exsig.inked, apInk=pads.apsig.inked;
+    if(exInk && (ASPECTS.some((a,i)=>!state[i]) || !v('exlic') || !v('exname'))) {
+      if(!confirm('The examiner signed, but not every aspect is marked C/NC or the licence number / name is blank.\n\nCreate the PDF anyway?')) { say(''); return; }
+    }
+    doc.setTitle('CA 61-19 - ground evaluation'); doc.setModificationDate(new Date());
+    const out=await doc.save();
+    const who=(v('apname')||'candidate').replace(/[^A-Za-z0-9]+/g,'_');
+    const name=`CA61-19_${who}_${dmy(v(exInk?'exdate':'apdate')).replace(/\//g,'-')||today}.pdf`;
+    const file=new File([out],name,{type:'application/pdf'});
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      try{ await navigator.share({files:[file],title:'CA 61-19'}); say('Shared '+name); return; }catch(e){ if(e.name==='AbortError'){ say('Share cancelled - tap again, or it downloads below.'); } }
+    }
+    const u=URL.createObjectURL(file), a=document.createElement('a'); a.href=u; a.download=name; a.click();
+    setTimeout(()=>URL.revokeObjectURL(u),4000); say('Downloaded '+name);
+  }catch(e){ say('Could not build the PDF: '+(e.message||e),1); }
+}
+</script>
+</body>
+</html>
